@@ -7,6 +7,9 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+
+	"github.com/pantopic/ext-cluster/host-wazero/pb"
+	"github.com/pantopic/wazero-pool"
 )
 
 // Name is the name of this host module.
@@ -21,6 +24,12 @@ type meta struct {
 	ptrBufCap uint32
 	ptrBufLen uint32
 	ptrBuf    uint32
+}
+
+type Manager interface {
+	Start(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error)
+	Stop(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error)
+	Reload(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error)
 }
 
 type hostModule struct {
@@ -75,26 +84,18 @@ func (h *hostModule) ContextCopy(dst, src context.Context) context.Context {
 
 // Register instantiates the host module, making it available to all module instances in this runtime
 func (h *hostModule) Register(ctx context.Context, r wazero.Runtime) (err error) {
-	builder := r.NewHostModuleBuilder(Name)
-	register := func(name string, fn func(ctx context.Context, m api.Module, stack []uint64)) {
-		builder = builder.NewFunctionBuilder().WithGoModuleFunction(api.GoModuleFunc(fn), nil, nil).Export(name)
-	}
-	for name, fn := range map[string]any{
-		"__relay_placeholder": func(ctx context.Context, data []byte) (err error) {
-			return
-		},
-	} {
-		switch fn := fn.(type) {
-		case func(context.Context, []byte) (err error):
-			register(name, func(ctx context.Context, mod api.Module, stack []uint64) {
-				meta := get[*meta](ctx, ctxKeyMeta)
-				fn(ctx, getDataCopy(mod, meta))
-			})
-		default:
-			log.Panicf("Method signature implementation missing: %#v", fn)
-		}
-	}
-	h.module, err = builder.Instantiate(ctx)
+	return
+}
+
+func (h *hostModule) Start(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error) {
+	return
+}
+
+func (h *hostModule) Stop(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error) {
+	return
+}
+
+func (h *hostModule) Reload(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error) {
 	return
 }
 
