@@ -34,8 +34,6 @@ type Manager interface {
 
 type hostModule struct {
 	sync.RWMutex
-
-	module api.Module
 }
 
 func New(opts ...Option) *hostModule {
