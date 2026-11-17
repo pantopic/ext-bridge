@@ -1,7 +1,7 @@
-# Relay
+# Bridge
 
 A [wazero](https://pkg.go.dev/github.com/tetratelabs/wazero) host module, ABI and guest SDK providing a pantopic cluster
-shard relay for WASI modules.
+shard bridge for WASI modules.
 
 ## Roadmap
 
