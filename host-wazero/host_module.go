@@ -1,4 +1,4 @@
-package wazero_relay
+package wazero_bridge
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 )
 
 // Name is the name of this host module.
-const Name = "pantopic/ext-relay"
+const Name = "pantopic/ext-bridge"
 
 var (
 	ctxKeyMeta = Name + `/meta`
@@ -50,7 +50,7 @@ func (h *hostModule) Name() string {
 
 // InitContext retrieves the meta page from the wasm module
 func (h *hostModule) InitContext(ctx context.Context, m api.Module) (context.Context, error) {
-	fn := m.ExportedFunction(`__relay`)
+	fn := m.ExportedFunction(`__bridge`)
 	if fn == nil {
 		return ctx, nil
 	}

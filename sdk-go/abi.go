@@ -1,4 +1,4 @@
-package relay
+package bridge
 
 import (
 	"unsafe"
@@ -6,7 +6,7 @@ import (
 	"github.com/pantopic/ext-cluster/sdk-go/pb"
 )
 
-type relayFunc func(term uint64, shard *pb.Shard)
+type bridgeFunc func(term uint64, shard *pb.Shard)
 
 var (
 	meta   = make([]uint32, 4)
@@ -15,15 +15,15 @@ var (
 	bufLen uint32
 	buf    []byte
 
-	relayStart  relayFunc
-	relayReload relayFunc
-	relayStop   relayFunc
+	bridgeStart  bridgeFunc
+	bridgeReload bridgeFunc
+	bridgeStop   bridgeFunc
 
 	shard = new(pb.Shard)
 )
 
-//export __relay
-func __relay() uint32 {
+//export __bridge
+func __bridge() uint32 {
 	for i, p := range []unsafe.Pointer{
 		unsafe.Pointer(&bufCap),
 		unsafe.Pointer(&bufLen),
@@ -35,19 +35,19 @@ func __relay() uint32 {
 	return uint32(uintptr(unsafe.Pointer(&meta[0])))
 }
 
-//export __relay_start
-func __relay_start() {
-	relayStart(term, getShard())
+//export __bridge_start
+func __bridge_start() {
+	bridgeStart(term, getShard())
 }
 
-//export __relay_reload
-func __relay_reload() {
-	relayReload(term, getShard())
+//export __bridge_reload
+func __bridge_reload() {
+	bridgeReload(term, getShard())
 }
 
-//export __relay_stop
-func __relay_stop() {
-	relayStop(term, getShard())
+//export __bridge_stop
+func __bridge_stop() {
+	bridgeStop(term, getShard())
 }
 
 func getShard() *pb.Shard {
@@ -58,7 +58,7 @@ func getShard() *pb.Shard {
 	return shard
 }
 
-var _ = __relay
-var _ = __relay_start
-var _ = __relay_stop
-var _ = __relay_reload
+var _ = __bridge
+var _ = __bridge_start
+var _ = __bridge_stop
+var _ = __bridge_reload

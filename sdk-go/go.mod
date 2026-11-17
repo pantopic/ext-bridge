@@ -1,4 +1,4 @@
-module github.com/pantopic/ext-relay/sdk-go
+module github.com/pantopic/ext-bridge/sdk-go
 
 go 1.27.3
 

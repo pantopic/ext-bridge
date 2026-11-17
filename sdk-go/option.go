@@ -1,4 +1,4 @@
-package relay
+package bridge
 
 type Option func()
 

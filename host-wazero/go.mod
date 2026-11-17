@@ -1,4 +1,4 @@
-module github.com/pantopic/ext-relay/host-wazero
+module github.com/pantopic/ext-bridge/host-wazero
 
 go 1.27.3
 

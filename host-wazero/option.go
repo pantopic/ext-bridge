@@ -1,3 +1,3 @@
-package wazero_relay
+package wazero_bridge
 
 type Option func(*hostModule)
