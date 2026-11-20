@@ -7,5 +7,4 @@ func Init(start, reload, stop bridgeFunc, opts ...Option) {
 	for _, opt := range opts {
 		opt()
 	}
-	buf = make([]byte, int(bufCap))
 }

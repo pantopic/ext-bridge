@@ -9,6 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 
 	"github.com/pantopic/ext-cluster/host-wazero/pb"
+	"github.com/pantopic/ext-util/host-wazero"
 	"github.com/pantopic/wazero-pool"
 )
 
@@ -27,9 +28,9 @@ type meta struct {
 }
 
 type Manager interface {
-	Start(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error)
-	Stop(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error)
-	Reload(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error)
+	Start(ctx context.Context, term uint64, shard *pb.Shard) (err error)
+	Stop(ctx context.Context, term uint64, shard *pb.Shard) (err error)
+	Reload(ctx context.Context, term uint64, shard *pb.Shard) (err error)
 }
 
 type hostModule struct {
@@ -66,7 +67,7 @@ func (h *hostModule) InitContext(ctx context.Context, m api.Module) (context.Con
 		&meta.ptrBufLen,
 		&meta.ptrBuf,
 	} {
-		*v = readUint32(m, ptr+uint32(4*i))
+		*v = wazero_util.ReadUint32(m, ptr+uint32(4*i))
 	}
 	ctx = context.WithValue(ctx, ctxKeyMeta, meta)
 	return ctx, nil
@@ -85,15 +86,54 @@ func (h *hostModule) Register(ctx context.Context, r wazero.Runtime) (err error)
 	return
 }
 
-func (h *hostModule) Start(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error) {
+func (h *hostModule) Start(ctx context.Context, term uint64, shard *pb.Shard) (err error) {
+	meta := get[*meta](ctx, ctxKeyMeta)
+	wazeropool.FromContext(ctx).Run(func(mod api.Module) {
+		setTerm(mod, meta, term)
+		n, err := shard.MarshalToVT(dataBuf(mod, meta))
+		if err != nil {
+			log.Fatal(err)
+		}
+		wazero_util.WriteUint32(mod, meta.ptrBufLen, uint32(n))
+		if _, err = mod.ExportedFunction("__bridge_start").Call(ctx); err != nil {
+			log.Printf("Error calling __bridge_start: %v", err)
+			return
+		}
+	})
 	return
 }
 
-func (h *hostModule) Stop(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error) {
+func (h *hostModule) Stop(ctx context.Context, term uint64, shard *pb.Shard) (err error) {
+	meta := get[*meta](ctx, ctxKeyMeta)
+	wazeropool.FromContext(ctx).Run(func(mod api.Module) {
+		setTerm(mod, meta, term)
+		n, err := shard.MarshalToVT(dataBuf(mod, meta))
+		if err != nil {
+			log.Fatal(err)
+		}
+		wazero_util.WriteUint32(mod, meta.ptrBufLen, uint32(n))
+		if _, err = mod.ExportedFunction("__bridge_stop").Call(ctx); err != nil {
+			log.Printf("Error calling __bridge_stop: %v", err)
+			return
+		}
+	})
 	return
 }
 
-func (h *hostModule) Reload(ctx context.Context, pool wazeropool.Instance, term uint64, shard *pb.Shard) (err error) {
+func (h *hostModule) Reload(ctx context.Context, term uint64, shard *pb.Shard) (err error) {
+	meta := get[*meta](ctx, ctxKeyMeta)
+	wazeropool.FromContext(ctx).Run(func(mod api.Module) {
+		setTerm(mod, meta, term)
+		n, err := shard.MarshalToVT(dataBuf(mod, meta))
+		if err != nil {
+			log.Fatal(err)
+		}
+		wazero_util.WriteUint32(mod, meta.ptrBufLen, uint32(n))
+		if _, err = mod.ExportedFunction("__bridge_reload").Call(ctx); err != nil {
+			log.Printf("Error calling __bridge_reload: %v", err)
+			return
+		}
+	})
 	return
 }
 
@@ -106,7 +146,7 @@ func get[T any](ctx context.Context, key string) T {
 }
 
 func getData(m api.Module, meta *meta) []byte {
-	return read(m, meta.ptrBuf, meta.ptrBufLen, meta.ptrBufCap)
+	return wazero_util.Read(m, meta.ptrBuf, meta.ptrBufLen, meta.ptrBufCap)
 }
 
 func getDataCopy(m api.Module, meta *meta) []byte {
@@ -114,55 +154,19 @@ func getDataCopy(m api.Module, meta *meta) []byte {
 }
 
 func dataBuf(m api.Module, meta *meta) []byte {
-	return read(m, meta.ptrBuf, 0, meta.ptrBufCap)
+	return wazero_util.Buffer(m, meta.ptrBuf, meta.ptrBufCap)
 }
 
 func setTerm(m api.Module, meta *meta, val uint64) {
-	writeUint64(m, meta.ptrTerm, val)
+	wazero_util.WriteUint64(m, meta.ptrTerm, val)
 }
 
 func getTerm(m api.Module, meta *meta) (val uint64) {
-	return readUint64(m, meta.ptrTerm)
+	return wazero_util.ReadUint64(m, meta.ptrTerm)
 }
 
 func setData(m api.Module, meta *meta, b []byte) {
 	buf := dataBuf(m, meta)
 	copy(buf[:cap(buf)], b)
-	writeUint32(m, meta.ptrBufLen, uint32(len(b)))
-}
-
-func read(m api.Module, ptrData, ptrLen, ptrMax uint32) (buf []byte) {
-	buf, ok := m.Memory().Read(ptrData, readUint32(m, ptrMax))
-	if !ok {
-		log.Panicf("Memory.Read(%d, %d) out of range", ptrData, ptrLen)
-	}
-	return buf[:readUint32(m, ptrLen)]
-}
-
-func readUint32(m api.Module, ptr uint32) (val uint32) {
-	val, ok := m.Memory().ReadUint32Le(ptr)
-	if !ok {
-		log.Panicf("Memory.Read(%d) out of range", ptr)
-	}
-	return
-}
-
-func readUint64(m api.Module, ptr uint32) (val uint64) {
-	val, ok := m.Memory().ReadUint64Le(ptr)
-	if !ok {
-		log.Panicf("Memory.Read(%d) out of range", ptr)
-	}
-	return
-}
-
-func writeUint32(m api.Module, ptr uint32, val uint32) {
-	if ok := m.Memory().WriteUint32Le(ptr, val); !ok {
-		log.Panicf("Memory.Read(%d) out of range", ptr)
-	}
-}
-
-func writeUint64(m api.Module, ptr uint32, val uint64) {
-	if ok := m.Memory().WriteUint64Le(ptr, val); !ok {
-		log.Panicf("Memory.Read(%d) out of range", ptr)
-	}
+	wazero_util.WriteUint32(m, meta.ptrBufLen, uint32(len(b)))
 }

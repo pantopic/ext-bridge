@@ -6,14 +6,18 @@ import (
 	"github.com/pantopic/ext-cluster/sdk-go/pb"
 )
 
-type bridgeFunc func(term uint64, shard *pb.Shard)
+type (
+	Shard = pb.Shard
+
+	bridgeFunc func(term uint64, shard *Shard)
+)
 
 var (
 	meta   = make([]uint32, 4)
 	term   uint64
 	bufCap uint32 = 4 << 10 // 4 KiB
 	bufLen uint32
-	buf    []byte
+	buf    = make([]byte, bufCap)
 
 	bridgeStart  bridgeFunc
 	bridgeReload bridgeFunc
@@ -25,10 +29,10 @@ var (
 //export __bridge
 func __bridge() uint32 {
 	for i, p := range []unsafe.Pointer{
+		unsafe.Pointer(&term),
 		unsafe.Pointer(&bufCap),
 		unsafe.Pointer(&bufLen),
 		unsafe.Pointer(&buf[0]),
-		unsafe.Pointer(&term),
 	} {
 		meta[i] = uint32(uintptr(p))
 	}
@@ -50,7 +54,7 @@ func __bridge_stop() {
 	bridgeStop(term, getShard())
 }
 
-func getShard() *pb.Shard {
+func getShard() *Shard {
 	shard.Reset()
 	if err := shard.UnmarshalVT(buf[:bufLen]); err != nil {
 		panic(err)
